@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CloudComputingGraph</title>
+</head>
+<body>
+<div>
+    <input id="input-uid" style=""/>
+    <button onclick="showUserGraph()">Search</button>
+    <button onclick="getPointAndFollowingEdge()">Follow</button>
+    <button onclick="getPointAndRecommendEdge()">Recommend</button>
+</div>
+<div id="div-graph" style="width: 100%; min-height: 1000px; margin: 0 auto;"></div>
+<script src="forceDirectLayout.js"></script>
+<script src="echarts.js"></script>
+<script>
+    function showEChartGraph(nodes, edges){
+        let chart = echarts.init(document.getElementById('div-graph'));
+        let chartOption = {
+            title: {
+                text: ''
+            },
+            animationDurationUpdate: 1500,
+            animationEasingUpdate: 'quinticInOut',
+            series : [
+                {
+                    type: 'graph',
+                    // layout: 'none',
+                    layout: 'force',
+                    legendHoverLink : true,             // 是否启用图例 hover 时的联动高亮
+                    force : {                           // 力引导图基本配置
+                        repulsion : 20,                 // 节点之间的斥力因子。支持数组表达斥力范围，值越大斥力越大。
+                        gravity : 0.05,                 // 节点受到的向中心的引力因子。该值越大节点越往中心点靠拢。
+                        edgeLength : 5,                // 边的两个节点之间的距离，这个距离也会受 repulsion[10, 50] 。值越小则长度越长
+                        layoutAnimation : true
+                        //因为力引导布局会在多次迭代后才会稳定，这个参数决定是否显示布局的迭代动画，在浏览器端节点数据较多（>100）的时候不建议关闭，布局过程会造成浏览器假死。
+                    },
+                    data: nodes.map(node => {
+                        return {
+                            // x: node.x,
+                            // y: node.y,
+                            id: node.id,
+                            name: node.label,
+                            symbolSize: node.size,
+                            itemStyle: {
+                                normal: {
+                                    color: node.color,
+                                }
+                            }
+                        };
+                    }),
+                    edges: edges.map((edge) => {
+                        return {
+                            source: edge.sourceID,
+                            target: edge.targetID,
+                        };
+                    }),
+                    label: {
+                        emphasis: {
+                            position: 'right',
+                            show: true
+                        }
+                    },
+                    roam: true,                         // 是否开启鼠标缩放和平移漫游
+                    draggable : true,                   // 节点是否可拖拽，只在使用力引导布局的时候有用。
+                    focusNodeAdjacency: true,           // 是否在鼠标移到节点上的时候突出显示节点以及节点的边和邻接节点。
+                    lineStyle: {
+                        normal: {
+                            width: 0.5,
+                            curveness: 0.3,
+                            opacity: 0.7
+                        }
+                    }
+                }
+            ]
+        };
+        chart.setOption(chartOption, true);
+    }
+</script>
+<script>
+    function getUserFollow(UId) {
+        fetch('/userFollow?uid='+UId)
+            .then(res => res.json())
+            .then(json => {
+                console.log(json);
+                let followings = json['following'];
+                let questions = json['question'];
+                let topics = json['topic'];
+                let nodes = [{
+                    x: 0,
+                    y: 0,
+                    id: UId,
+                    label: UId,
+                    size: 15
+                }];
+                let edges = [];
+                let theta = 0;
+                followings.map(following => {
+                    let node = {
+                        id: following['urlToken'],
+                        label: following['name'],
+                        size: Math.floor(Math.random() * 20 + 5),
+                        color: 'red',
+                    };
+                    node['x'] = (Math.floor(theta/360) + 1) * Math.floor(Math.sin(theta) * (node.size / Math.PI * 180 / 10));
+                    node['y'] = - (Math.floor(theta/360) + 1) * Math.floor(Math.cos(theta) * (node.size / Math.PI * 180 / 10));
+                    theta += 30;
+                    nodes.push(node);
+                    edges.push({
+                        sourceID: UId,
+                        targetID: following['urlToken'],
+                    });
+                });
+                theta = 10;
+                questions.map(following => {
+                    let node = {
+                        id: following['id'],
+                        label: following['title'],
+                        size: Math.floor(Math.random() * 20 + 5),
+                        color: 'blue',
+                    };
+                    node['x'] = (Math.floor(theta/360) + 1) * Math.floor(Math.sin(theta) * (node.size / Math.PI * 180 / 10));
+                    node['y'] = - (Math.floor(theta/360) + 1) * Math.floor(Math.cos(theta) * (node.size / Math.PI * 180 / 10));
+                    theta += 30;
+                    nodes.push(node);
+                    edges.push({
+                        sourceID: UId,
+                        targetID: following['id'],
+                    });
+                });
+                theta = 20;
+                topics.map(following => {
+                    let node = {
+                        id: following['id'],
+                        label: following['title'],
+                        size: Math.floor(Math.random() * 20 + 5),
+                        color: 'green',
+                    };
+                    node['x'] = (Math.floor(theta/360) + 1) * Math.floor(Math.sin(theta) * (node.size / Math.PI * 180 / 10));
+                    node['y'] = - (Math.floor(theta/360) + 1) * Math.floor(Math.cos(theta) * (node.size / Math.PI * 180 / 10));
+                    theta += 30;
+                    nodes.push(node);
+                    edges.push({
+                        sourceID: UId,
+                        targetID: following['id'],
+                    });
+                });
+                showGraph(nodes, edges);
+            });
+    }
+
+    function showUserGraph() {
+        let UId = document.getElementById('input-uid').value;
+        if ( UId.length > 0 ) {
+            getUserFollow(UId);
+        }
+    }
+</script>
+<script>
+    let OK_User_Top = false;
+    let OK_User = false;
+    let OK_Follow = false;
+    const userTopLimit = 20;
+    function showGraph(coreNodes, allNodes, allEdges) {
+        console.log(coreNodes.length + ' : ' + allNodes.length + ' : ' + allEdges.length)
+        let nodes = [];
+        let edges = [];
+
+        let userTopIds = [];
+        // let theta = 0, disTheta = 24;
+        // let min_x = 0, max_x = 0, min_y = 0, max_y = 0;
+        coreNodes.map(user => {
+            if ( 'urlToken' in user && 'name' in user && !(user.urlToken in userTopIds) ) {
+                userTopIds.push(user.urlToken);
+                let node = {
+                    id: user.urlToken,
+                    label: user.name,
+                    size: Math.floor(user.node['_2'] / 1000 * 80),
+                    // size: 5,
+                    // maxSize: Math.floor(Math.min(user.node['_2'], 400)),
+                    color: 'red',
+                };
+                // node['x'] = Math.floor(theta/360 + 1) * Math.floor(Math.cos(theta) * (node.maxSize*2) * 180 / disTheta / Math.PI);
+                // node['y'] = Math.floor(theta/360 + 1) * Math.floor(Math.sin(theta) * (node.maxSize*2) * 180 / disTheta / Math.PI);
+                // theta += disTheta;
+                // min_x = Math.min(min_x, node.x);
+                // max_x = Math.max(max_x, node.x);
+                // min_y = Math.min(min_y, node.y);
+                // max_y = Math.max(max_y, node.y);
+                nodes.push(node);
+            }
+        });
+        console.log(userTopIds);
+
+        let followingIds = [];
+        allEdges.map(following => {
+            if ( userTopIds.indexOf(following.srcId) > -1 || userTopIds.indexOf(following.dstId) > -1 ) {
+                if ( followingIds.indexOf(following.srcId) === -1 ) {
+                    followingIds.push(following.srcId);
+                }
+                if ( followingIds.indexOf(following.dstId) === -1 ) {
+                    followingIds.push(following.dstId);
+                }
+            }
+        });
+        console.log(followingIds);
+
+        // theta = 360, disTheta = 10;
+        allNodes.map(user => {
+            if ( 'urlToken' in user && 'name' in user && userTopIds.indexOf(user.urlToken) === -1 && followingIds.indexOf(user.urlToken) > -1 ) {
+                let node = {
+                    id: user.urlToken.toString(),
+                    label: user.name,
+                    size: Math.max(Math.floor(Math.min(user.node['_2'], 50) / 50 * 12), 3),
+                    // size: 5,
+                    color: 'green',
+                };
+                // node['x'] = Math.floor(theta/360 + 1) * Math.floor(Math.cos(theta) * (node.size*5) * 180 / disTheta / Math.PI);
+                // node['y'] = Math.floor(theta/360 + 1) * Math.floor(Math.sin(theta) * (node.size*5) * 180 / disTheta / Math.PI);
+                // theta += disTheta;
+                // if ( node.x > 0 ) { node.x += max_x; }
+                // else { node.x += min_x; }
+                // if ( node.y > 0 ) { node.y += max_y; }
+                // else { node.y += min_y; }
+                nodes.push(node);
+            }
+        });
+
+        console.log(nodes);
+
+        let nodeIds = [];
+        nodes.map(node => nodeIds.push(node.id));
+        allEdges.map(following => {
+            if ( nodeIds.indexOf(following.srcId) > -1 && nodeIds.indexOf(following.dstId) > -1 ) {
+                let edge = {
+                    sourceID: following.srcId.toString(),
+                    targetID: following.dstId.toString(),
+                };
+                edges.push(edge);
+            }
+        });
+        console.log(nodes);
+        console.log(edges);
+        mNodeList = nodes;
+        mEdgeList = edges;
+        // nodes = ForceDirected(nodes, edges);
+        showEChartGraph(nodes, edges);
+    }
+    function getPointAndFollowingEdge() {
+        let users = [];
+        let usersTop = [];
+        let followings = [];
+
+        // fetch('/userRankTop?top='+userTopLimit)
+        //     .then(res => res.json())
+        //     .then(json => {
+        //         usersTop = json;
+        //         OK_User_Top = true;
+        //     });
+        // fetch('/userRankAll')
+        //     .then(res => res.json())
+        //     .then(json => {
+        //         users = json;
+        //         OK_User = true;
+        //     });
+        // fetch('/userFollowEdge')
+        //     .then(res => res.json())
+        //     .then(json => {
+        //         followings = json;
+        //         OK_Follow = true;
+        //     });
+        fetch('/user_RankTop?top='+userTopLimit)
+            .then(res => res.json())
+            .then(json => {
+                json.map(data => {
+                    usersTop.push({
+                        urlToken: data.id.toString(),
+                        name: data.node['_1'],
+                        node: data.node
+                    })
+                });
+                OK_User_Top = true;
+            });
+        fetch('/user_RankAll')
+            .then(res => res.json())
+            .then(json => {
+                json.map(data => {
+                    users.push({
+                        urlToken: data.id.toString(),
+                        name: data.node['_1'],
+                        node: data.node
+                    })
+                });
+                OK_User = true;
+            });
+        fetch('/user_FollowEdge')
+            .then(res => res.json())
+            .then(json => {
+                json.map(data => {
+                    followings.push({
+                        srcId: data.srcId.toString(),
+                        dstId: data.dstId.toString(),
+                    })
+                });
+                OK_Follow = true;
+            });
+
+        let INVL_waitFollowAndRank = setInterval(() => {
+            if ( OK_User_Top && OK_User && OK_Follow ) {
+                OK_User_Top = false;
+                OK_User = false;
+                OK_Follow = false;
+                window.clearInterval(INVL_waitFollowAndRank);
+                showGraph(usersTop, users, followings);
+            }
+        }, 1000);
+    }
+</script>
+<script>
+    function getPointAndRecommendEdge() {
+        let users = [];
+        let usersTop = [];
+        let recommends = [];
+        fetch('/user_RankTop?top='+userTopLimit)
+            .then(res => res.json())
+            .then(json => {
+                json.map(data => {
+                    usersTop.push({
+                        urlToken: data.id.toString(),
+                        name: data.node['_1'],
+                        node: data.node
+                    })
+                });
+                OK_User_Top = true;
+            });
+        fetch('/user_RankAll')
+            .then(res => res.json())
+            .then(json => {
+                json.map(data => {
+                    users.push({
+                        urlToken: data.id.toString(),
+                        name: data.node['_1'],
+                        node: data.node
+                    })
+                });
+                OK_User = true;
+            });
+        fetch('/user_RecommendEdge')
+            .then(res => res.json())
+            .then(json => {
+                json.map(data => {
+                    recommends.push({
+                        srcId: data.srcId.toString(),
+                        dstId: data.dstId.toString(),
+                    })
+                });
+                OK_Follow = true;
+            });
+
+        let INVL_waitFollowAndRank = setInterval(() => {
+            if ( OK_User_Top && OK_User && OK_Follow ) {
+                OK_User_Top = false;
+                OK_User = false;
+                OK_Follow = false;
+                window.clearInterval(INVL_waitFollowAndRank);
+                showGraph(usersTop, users, recommends);
+            }
+        }, 1000);
+    }
+</script>
+</body>
+</html>
